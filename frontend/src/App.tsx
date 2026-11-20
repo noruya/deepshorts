@@ -32,6 +32,7 @@ export default function App() {
   const switchTo = (m: "room" | "shorts") => {
     localStorage.setItem("wr_mode", m);
     setMode(m);
+    window.location.reload(); // 완전 초기화: WS·회의 상태 꼬임 방지
   };
   return mode === "room" ? <WritersRoom onSwitch={() => switchTo("shorts")} /> : <Home onSwitch={() => switchTo("room")} />;
 }
@@ -140,16 +141,9 @@ function Home({ onSwitch }: { onSwitch?: () => void }) {
             {apiStatus === "online" ? "API Ready" : apiStatus === "offline" ? "API Offline" : "Checking…"}
           </span>
           {onSwitch && (
-            <motion.button
-              type="button"
-              className="theme-toggle"
-              whileTap={{ scale: 0.85 }}
-              onClick={onSwitch}
-              aria-label="AI 작가의 방으로 전환"
-              title="AI 작가의 방으로 전환"
-            >
-              🗣️
-            </motion.button>
+            <button type="button" className="btn-ghost mode-switch" onClick={onSwitch}>
+              🗣️ 작가의 방으로 전환
+            </button>
           )}
           <motion.button
             type="button"

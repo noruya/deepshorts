@@ -158,8 +158,8 @@ export default function WritersRoom({ onSwitch }: Props) {
               호출 {usage.calls}회 · {usage.prompt_tokens.toLocaleString()}+{usage.completion_tokens.toLocaleString()} tok
             </span>
           )}
-          <button type="button" className="theme-toggle" onClick={onSwitch} title="DeepShorts 생성기로 전환">
-            🎞️
+          <button type="button" className="btn-ghost mode-switch" onClick={onSwitch} title="DeepShorts 생성기로 전환">
+            🎞️ DeepShorts 생성기
           </button>
         </div>
       </header>
