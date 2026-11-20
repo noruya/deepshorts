@@ -140,3 +140,24 @@ export function generateStream(
     };
   });
 }
+
+// ===================== AI 작가회의 (Writers' Room) =====================
+
+export interface MeetingProject {
+  id: string;
+  name: string;
+}
+
+export async function createMeetingProject(name: string): Promise<MeetingProject> {
+  const res = await fetch(`${API_BASE}/api/meeting/projects`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) throw new Error("프로젝트 생성 실패");
+  return res.json();
+}
+
+export function meetingWsUrl(pid: string): string {
+  return `${API_BASE.replace(/^http/, "ws")}/api/meeting/ws/${pid}`;
+}

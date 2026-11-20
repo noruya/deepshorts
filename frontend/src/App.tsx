@@ -15,6 +15,7 @@ import MovieOutput from "./components/MovieOutput";
 import HistoryPanel from "./components/HistoryPanel";
 import ErrorBanner from "./components/ErrorBanner";
 import DramaView from "./components/DramaView";
+import WritersRoom from "./components/WritersRoom";
 import type { HistoryItem } from "./types";
 
 type Status = "idle" | "generating" | "done" | "error";
@@ -23,10 +24,19 @@ export default function App() {
   // tiny router: /drama/:id is the shared read-only view (kept hook-free above any hooks)
   const dramaMatch = window.location.pathname.match(/^\/drama\/([^/]+)$/);
   if (dramaMatch) return <DramaView id={dramaMatch[1]} />;
-  return <Home />;
+
+  // 두 가지 모드: AI 작가의 방(회의형) / DeepShorts(일회성 생성기)
+  const [mode, setMode] = useState<"room" | "shorts">(
+    () => (localStorage.getItem("wr_mode") as "room" | "shorts") || "room",
+  );
+  const switchTo = (m: "room" | "shorts") => {
+    localStorage.setItem("wr_mode", m);
+    setMode(m);
+  };
+  return mode === "room" ? <WritersRoom onSwitch={() => switchTo("shorts")} /> : <Home onSwitch={() => switchTo("room")} />;
 }
 
-function Home() {
+function Home({ onSwitch }: { onSwitch?: () => void }) {
   const { options } = useOptions();
   const history = useHistory();
   const apiStatus = useHealth();
@@ -129,6 +139,18 @@ function Home() {
             <span className="status-dot" />
             {apiStatus === "online" ? "API Ready" : apiStatus === "offline" ? "API Offline" : "Checking…"}
           </span>
+          {onSwitch && (
+            <motion.button
+              type="button"
+              className="theme-toggle"
+              whileTap={{ scale: 0.85 }}
+              onClick={onSwitch}
+              aria-label="AI 작가의 방으로 전환"
+              title="AI 작가의 방으로 전환"
+            >
+              🗣️
+            </motion.button>
+          )}
           <motion.button
             type="button"
             className="theme-toggle"

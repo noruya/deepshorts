@@ -1,11 +1,19 @@
+"""SQLite 저장소 — 회의 메시지·고정 설정·작가 기억·비용·프로젝트. 모든 발언은 즉시 저장."""
+from __future__ import annotations
+
 import os
 import sqlite3
 import threading
 import time
 
-DB_PATH = os.environ.get("SENARIO_DB", os.path.join(os.path.dirname(__file__), "..", "data.db"))
+from app.config import settings
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS projects(
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  created REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS messages(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   project_id TEXT NOT NULL,
@@ -42,7 +50,8 @@ CREATE TABLE IF NOT EXISTS usage(
 
 
 class Store:
-    def __init__(self, path: str = DB_PATH):
+    def __init__(self, path: str | None = None):
+        path = path or str(settings.db_path)
         os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
         self.db = sqlite3.connect(path, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
@@ -51,6 +60,18 @@ class Store:
             self.db.executescript(SCHEMA)
             self.db.commit()
 
+    # ---- projects ----
+    def create_project(self, pid: str, name: str) -> None:
+        with self.lock:
+            self.db.execute("INSERT INTO projects(id,name,created) VALUES(?,?,?)", (pid, name, time.time()))
+            self.db.commit()
+
+    def get_projects(self) -> list[dict]:
+        with self.lock:
+            rows = self.db.execute("SELECT id,name,created FROM projects ORDER BY created DESC").fetchall()
+        return [dict(r) for r in rows]
+
+    # ---- messages ----
     def add_message(self, project_id: str, speaker: str, role: str, text: str, status: str = "normal") -> int:
         with self.lock:
             cur = self.db.execute(
@@ -68,6 +89,7 @@ class Store:
             ).fetchall()
         return [dict(r) for r in rows]
 
+    # ---- settings (감독 승인으로 고정된 것만 기록) ----
     def approve_message(self, project_id: str, msg_id: int, key: str = "decision") -> dict | None:
         with self.lock:
             row = self.db.execute(
@@ -90,6 +112,24 @@ class Store:
             ).fetchall()
         return [dict(r) for r in rows]
 
+    # ---- memories (작가별 장기 기억) ----
+    def save_memory(self, project_id: str, writer_id: str, content: str) -> None:
+        with self.lock:
+            self.db.execute(
+                "INSERT INTO memories(project_id,writer_id,content,ts) VALUES(?,?,?,?)",
+                (project_id, writer_id, content, time.time()),
+            )
+            self.db.commit()
+
+    def get_memories(self, project_id: str, writer_id: str, limit: int = 5) -> list[str]:
+        with self.lock:
+            rows = self.db.execute(
+                "SELECT content FROM memories WHERE project_id=? AND writer_id=? ORDER BY id DESC LIMIT ?",
+                (project_id, writer_id, limit),
+            ).fetchall()
+        return [r["content"] for r in rows]
+
+    # ---- usage (모든 모델 호출 비용 기록) ----
     def add_usage(self, project_id: str, speaker: str, model: str, usage: dict) -> None:
         with self.lock:
             self.db.execute(
@@ -113,19 +153,3 @@ class Store:
                 (project_id,),
             ).fetchone()
         return {"calls": row["n"], "prompt_tokens": row["p"], "completion_tokens": row["c"]}
-
-    def save_memory(self, project_id: str, writer_id: str, content: str) -> None:
-        with self.lock:
-            self.db.execute(
-                "INSERT INTO memories(project_id,writer_id,content,ts) VALUES(?,?,?,?)",
-                (project_id, writer_id, content, time.time()),
-            )
-            self.db.commit()
-
-    def get_memories(self, project_id: str, writer_id: str, limit: int = 5) -> list[str]:
-        with self.lock:
-            rows = self.db.execute(
-                "SELECT content FROM memories WHERE project_id=? AND writer_id=? ORDER BY id DESC LIMIT ?",
-                (project_id, writer_id, limit),
-            ).fetchall()
-        return [r["content"] for r in rows]

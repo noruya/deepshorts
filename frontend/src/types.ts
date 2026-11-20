@@ -104,3 +104,35 @@ export interface HistoryItem {
   date: string;
   script: Script;
 }
+
+// ===================== AI 작가회의 (Writers' Room) =====================
+// Mirrors backend/app/meeting/ WS protocol.
+
+export interface MeetingMessage {
+  id: number;
+  speaker: string;
+  role: "director" | "writer" | "system";
+  text: string;
+  status: "normal" | "proposed" | "approved";
+  ts: number;
+  kind?: string | null;
+}
+
+export interface LockedSetting {
+  key: string;
+  value: string;
+  ts: number;
+}
+
+export interface MeetingUsage {
+  calls: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+}
+
+export type MeetingState =
+  | "connecting"
+  | "running"
+  | "paused"
+  | "waiting_approval"
+  | "stopped";

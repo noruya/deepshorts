@@ -28,3 +28,10 @@ Thumbs.db
 
 # stray Firebase config scratch file (real config lives in frontend/.env)
 firebaseconfig.txt
+
+# AI Writers' Room 개조 시 추가
+backend/data.db
+frontend/tsconfig*.tsbuildinfo
+frontend/vite.config.d.ts
+frontend/vite.config.js
+graphify-out/

@@ -43,6 +43,14 @@ class Settings(BaseSettings):
     prompts_dir: Path = _REPO_ROOT / "prompts"
     log_dir: Path = _BACKEND_DIR / "logs"
     director_images_dir: Path = _REPO_ROOT / "directors"   # <id>.jpg photos for the UI
+    db_path: Path = _BACKEND_DIR / "data.db"               # 회의/시나리오 자동 저장
+
+    # --- Writers' room (AI 작가회의) ---
+    llm_provider: str = "gemini"          # gemini | openai (공급자 교체)
+    openai_api_key: str = ""
+    openai_base_url: str = "https://api.openai.com/v1"
+    openai_model: str = "gpt-4o-mini"
+    max_rounds: int = 2                   # 토론 루프: 작가 3명 × N라운드 (발언 횟수 제한)
 
     # --- CORS ---
     # "*" is fine here: this is a public, unauthenticated, cookie-free API (no user

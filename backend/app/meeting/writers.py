@@ -1,4 +1,4 @@
-"""AI 작가 3명의 페르소나와 프롬프트 구성."""
+"""작가 3명의 페르소나와 회의 규칙 프롬프트."""
 
 RULES = """[회의 규칙]
 - 감독님에게는 항상 존댓말을 쓴다. 작가 동료와는 편하게 말하며 서로 반박하고 의견을 발전시켜도 좋다.
@@ -39,8 +39,8 @@ WRITERS = [
 ]
 
 
-def build_prompt(writer: Writer, history: list[dict], locked: list[dict], memories: list[str], goal: str) -> list[dict]:
-    """작가 1명의 발언 생성용 메시지 배열."""
+def build_prompt(writer: Writer, history: list[dict], locked: list[dict], memories: list[str], goal: str) -> tuple[str, str]:
+    """작가 1명의 발언 생성용 (system, user)."""
     transcript = "\n".join(f"{m['speaker']}: {m['text']}" for m in history[-20:])
     locked_text = "\n".join(f"- {s['value']}" for s in locked) or "(아직 없음)"
     memory_text = "\n".join(f"- {m}" for m in memories[-3:]) or "(첫 회의입니다)"
@@ -57,27 +57,17 @@ def build_prompt(writer: Writer, history: list[dict], locked: list[dict], memori
 {memory_text}
 
 이 지시와 회의 상황에 대해 '{writer.name}'로서 다음 발언을 한다."""
-    return [
-        {"role": "system", "content": writer.persona + "\n\n" + RULES},
-        {"role": "user", "content": user},
-    ]
+    return writer.persona + "\n\n" + RULES, user
 
 
-def build_document_prompt(doc: str, history: list[dict], locked: list[dict]) -> list[dict]:
-    """로그라인/시놉시스 자동 작성용."""
+def build_doc_prompt(kind: str, history: list[dict], locked: list[dict]) -> tuple[str, str]:
+    """로그라인/시놉시스 자동 작성용 (system, user)."""
     transcript = "\n".join(f"{m['speaker']}: {m['text']}" for m in history[-30:])
     locked_text = "\n".join(f"- {s['value']}" for s in locked) or "(없음)"
-    instruction = (
-        "로그라인을 1~2문장으로 작성한다." if doc == "logline" else "1페이지 분량의 시놉시스를 작성한다."
+    instruction = "로그라인을 1~2문장으로 작성한다." if kind == "logline" else "1페이지 분량의 시놉시스를 작성한다."
+    system = (
+        "너는 감독님의 회의 내용을 문서로 정리하는 시나리오 작가다. "
+        "확정된 설정은 절대 어기지 않고, 새 제안이 생기면 그 문장 앞에 [제안]을 붙인다."
     )
-    return [
-        {
-            "role": "system",
-            "content": "너는 감독님의 회의 내용을 문서로 정리하는 시나리오 작가다. "
-            "확정된 설정은 절대 어기지 않고, 제안 내용은 [제안] 접두어를 붙인다.",
-        },
-        {
-            "role": "user",
-            "content": f"[회의 내용]\n{transcript}\n\n[확정된 설정]\n{locked_text}\n\n{instruction}",
-        },
-    ]
+    user = f"[회의 내용]\n{transcript}\n\n[확정된 설정]\n{locked_text}\n\n{instruction}"
+    return system, user

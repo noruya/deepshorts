@@ -24,6 +24,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.graph.pipeline import PIPELINE_GRAPH, _final_meta, run, stream
+from app.meeting.routes import router as meeting_router
 from app.llm.client import AgentError
 from app.llm.rate_limiter import RateLimitExceeded
 from app.prompts_loader import list_directors, list_moods, pretty
@@ -36,6 +37,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(meeting_router)   # AI 작가회의 (writers' room)
 
 # Serve director photos (top-level directors/<id>.jpg) for the UI selector.
 if settings.director_images_dir.exists():
