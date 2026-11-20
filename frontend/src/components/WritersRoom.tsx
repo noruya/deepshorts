@@ -141,7 +141,7 @@ export default function WritersRoom({ onSwitch }: Props) {
 
   function sendDirector() {
     const text = input.trim();
-    if (!text || busy) return;
+    if (!text) return;
     send({ type: "director", text });
     setInput("");
   }
@@ -244,12 +244,11 @@ export default function WritersRoom({ onSwitch }: Props) {
                 }
               }}
               rows={2}
-              placeholder={busy ? "회의 진행 중 — 입력하면 개입(다음 발언에 우선 반영)" : "감독님의 지시를 입력하세요"}
-              disabled={busy}
+              placeholder={busy ? "개입: 지금 입력하면 다음 발언에 우선 반영됩니다" : "감독님의 지시를 입력하세요"}
             />
             <div className="room-actions">
-              <button type="button" className="btn-primary" onClick={sendDirector} disabled={!input.trim() || busy}>
-                {running ? "개입 대기" : "지시하기"}
+              <button type="button" className="btn-primary" onClick={sendDirector} disabled={!input.trim()}>
+                {running ? "개입" : "지시하기"}
               </button>
               <button type="button" className="btn-ghost" onClick={() => send({ type: "pause" })} disabled={!running}>
                 ⏸ 일시정지
