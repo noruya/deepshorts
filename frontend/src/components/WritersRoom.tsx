@@ -36,6 +36,9 @@ export default function WritersRoom({ onSwitch }: Props) {
   const [pid, setPid] = useState<string | null>(() => localStorage.getItem("wr_project_id"));
   const [messages, setMessages] = useState<MeetingMessage[]>([]);
   const [locked, setLocked] = useState<LockedSetting[]>([]);
+  const [draft, setDraft] = useState<string | null>(null);
+  const [draftStream, setDraftStream] = useState<string | null>(null);
+  const [drafting, setDrafting] = useState(false);
   const [usage, setUsage] = useState<MeetingUsage | null>(null);
   const [state, setState] = useState<MeetingState>("connecting");
   const [stream, setStream] = useState<{ speaker: string; text: string } | null>(null);
@@ -75,7 +78,8 @@ export default function WritersRoom({ onSwitch }: Props) {
         switch (evt.type) {
           case "history":
             setMessages(evt.messages);
-            setLocked(evt.settings);
+            setLocked(evt.settings.filter((s: any) => s.key !== "draft"));
+            setDraft((evt.settings.find((s: any) => s.key === "draft") || {}).value || null);
             break;
           case "message":
             setMessages((prev) => [...prev, evt as MeetingMessage]);
@@ -90,6 +94,17 @@ export default function WritersRoom({ onSwitch }: Props) {
             break;
           case "speaking":
             setStream(null);
+            break;
+          case "draft_chunk":
+            setDraftStream((prev) => (prev || "") + evt.text);
+            break;
+          case "draft":
+            setDraft(evt.text);
+            setDraftStream(null);
+            break;
+          case "drafting":
+            setDrafting(evt.on);
+            if (!evt.on) setDraftStream(null);
             break;
           case "state":
             setState(evt.state);
@@ -268,8 +283,22 @@ export default function WritersRoom({ onSwitch }: Props) {
               </div>
             </div>
           ))}
-          <h3 className="side-title">스토리 바이블 (확정 설정)</h3>
-          {locked.length === 0 ? (
+          <h3 className="side-title">작품 원고 {drafting ? "· 집필 중…" : "(실시간)"}</h3>
+          <div className="draft-panel">
+            {draftStream ? (
+              <pre className="draft-text">{draftStream}<span className="cursor">▌</span></pre>
+            ) : draft ? (
+              <pre className="draft-text">{draft}</pre>
+            ) : (
+              <p className="side-empty">첫 라운드가 끝나면 집필자가 회의 내용으로 원고를 만듭니다.</p>
+            )}
+            {draft && !busy && !drafting && (
+              <button type="button" className="approve-btn draft-approve" onClick={() => send({ type: "approve_draft" })}>
+                🎬 이 원고를 시나리오로 확정
+              </button>
+            )}
+          </div>
+          <h3 className="side-title">스토리 바이블 (확정 설정)</h3>          {locked.length === 0 ? (
             <p className="side-empty">아직 확정된 설정이 없습니다. 제안을 승인하면 이곳에 고정됩니다.</p>
           ) : (
             locked.map((s, i) => (

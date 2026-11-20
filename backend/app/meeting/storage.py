@@ -112,6 +112,24 @@ class Store:
             ).fetchall()
         return [dict(r) for r in rows]
 
+    def get_setting(self, project_id: str, key: str) -> str | None:
+        """살아있는 문서(원고 등)용 — 같은 키는 값을 교체한다."""
+        with self.lock:
+            row = self.db.execute(
+                "SELECT value FROM settings WHERE project_id=? AND key=? ORDER BY id DESC LIMIT 1",
+                (project_id, key),
+            ).fetchone()
+        return row["value"] if row else None
+
+    def set_setting(self, project_id: str, key: str, value: str) -> None:
+        with self.lock:
+            self.db.execute("DELETE FROM settings WHERE project_id=? AND key=?", (project_id, key))
+            self.db.execute(
+                "INSERT INTO settings(project_id,key,value,ts) VALUES(?,?,?,?)",
+                (project_id, key, value, time.time()),
+            )
+            self.db.commit()
+
     # ---- memories (작가별 장기 기억) ----
     def save_memory(self, project_id: str, writer_id: str, content: str) -> None:
         with self.lock:

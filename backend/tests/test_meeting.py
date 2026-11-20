@@ -43,18 +43,29 @@ async def main():
     assert all(m["status"] == "proposed" for m in msgs), "[제안] 파싱 실패"
     assert all(m["ts"] > 0 for m in msgs), "타임스탬프 누락"
 
+    # 1b) 집필자: 라운드마다 원고 갱신 → 같은 키는 교체(살아있는 문서)
+    draft = s.store.get_setting("t1", "draft")
+    assert draft and "[제안]" in draft, "원고 미작성"
+    draft_events = [m for m in s.ws.sent if m.get("type") == "draft"]
+    assert len(draft_events) == 2, f"라운드 수만큼 원고 갱신: {len(draft_events)}"
+
+    # 1c) 원고 승인 → 시나리오 확정
+    await s.handle({"type": "approve_draft"})
+    scenario = s.store.get_setting("t1", "scenario")
+    assert scenario == draft, "원고 승인 실패"
+
     # 2) 승인 → 고정 설정 기록
     await s.handle({"type": "approve", "id": msgs[0]["id"], "key": "decision"})
-    locked = s.store.get_settings("t1")
-    assert len(locked) == 1 and locked[0]["key"] == "decision"
+    locked = [x for x in s.store.get_settings("t1") if x["key"] == "decision"]
+    assert len(locked) == 1, locked
     locked_msg = [m for m in s.store.get_messages("t1") if m["id"] == msgs[0]["id"]][0]
     assert locked_msg["status"] == "approved"
 
-    # 3) 장기 기억 + 비용 기록
+    # 3) 장기 기억 + 비용 기록 (작가 6회 + 집필자 2회)
     s.save_memories()
     assert s.store.get_memories("t1", "story"), "작가 기억 미저장"
     usage = s.store.get_usage("t1")
-    assert usage["calls"] == 6 and usage["prompt_tokens"] == 60, usage
+    assert usage["calls"] == 8 and usage["prompt_tokens"] == 80, usage
 
     # 4) 중단: 진행 중 회의를 stop → 취소되고 중단 메시지가 저장된다
     await s.handle({"type": "director", "text": "두 번째 지시"})

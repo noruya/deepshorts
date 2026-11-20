@@ -17,7 +17,7 @@ from fastapi import WebSocket
 from app.config import settings
 from app.meeting.provider import get_provider
 from app.meeting.storage import Store
-from app.meeting.writers import WRITERS, build_doc_prompt, build_prompt
+from app.meeting.writers import WRITERS, build_draft_prompt, build_doc_prompt, build_prompt
 
 DUMMY_TEXT = (
     "[제안] 감독님, LLM API 키가 설정되지 않아 더미 응답으로 회의를 진행합니다. "
@@ -96,6 +96,8 @@ class MeetingSession:
             await self.on_stop()
         elif t == "approve":
             await self.on_approve(int(data.get("id", 0)), data.get("key") or "decision")
+        elif t == "approve_draft":
+            await self.on_approve_draft()
         elif t in ("logline", "synopsis"):
             if not self._busy():
                 self.stopped = False
@@ -137,6 +139,16 @@ class MeetingSession:
         else:
             await self.send({"type": "error", "text": "승인할 발언을 찾지 못했습니다."})
 
+    async def on_approve_draft(self):
+        """현재 원고를 시나리오(확정)로 승인."""
+        draft = self.store.get_setting(self.pid, "draft")
+        if not draft:
+            await self.send({"type": "error", "text": "아직 작성된 원고가 없습니다."})
+            return
+        self.store.set_setting(self.pid, "scenario", draft)
+        await self.send({"type": "locked", "key": "scenario", "value": draft})
+        await self.send_state()
+
     # ------------------------------------------------------------ generation
     async def run_rounds(self, goal: str):
         try:
@@ -146,6 +158,7 @@ class MeetingSession:
                     if self.stopped:
                         return
                     await self.turn(w, goal)
+                await self.update_draft()             # 라운드마다 원고를 실시간 갱신
             self.save_memories()
             await self.send_state()
         except asyncio.CancelledError:
@@ -180,6 +193,41 @@ class MeetingSession:
         except asyncio.CancelledError:
             if buf:  # 중단돼도 지금까지의 발언은 저장 (모든 발언 기록 원칙)
                 await self.send_message(writer.name, "writer", "".join(buf) + " …(감독이 중단함)")
+            raise
+
+    async def update_draft(self):
+        """침묵의 '집필자' — 라운드가 끝날 때마다 회의 내용을 작품 원고로 갱신한다."""
+        try:
+            await self.paused.wait()
+            if self.stopped:
+                return
+            history = self.store.get_messages(self.pid)
+            locked = self.store.get_settings(self.pid)
+            prev = self.store.get_setting(self.pid, "draft")
+            system, user = build_draft_prompt(history, locked, prev)
+            await self.send({"type": "drafting", "on": True})
+            buf: list[str] = []
+            try:
+                async for part in self.llm.stream_text(system, user):
+                    if "error" in part:
+                        await self.send({"type": "error", "text": part["error"]})
+                        continue
+                    if "text" in part:
+                        buf.append(part["text"])
+                        await self.send({"type": "draft_chunk", "text": part["text"]})
+                text = "".join(buf)
+                if text:
+                    self.store.set_setting(self.pid, "draft", text)
+                    await self.send({"type": "draft", "text": text})
+                if part.get("usage"):
+                    self.store.add_usage(self.pid, "집필자", self.llm.name, part["usage"])
+            except asyncio.CancelledError:
+                if buf:  # 중단돼도 여기까지의 원고는 보존
+                    self.store.set_setting(self.pid, "draft", "".join(buf))
+                raise
+            finally:
+                await self.send({"type": "drafting", "on": False})
+        except asyncio.CancelledError:
             raise
 
     async def generate_doc(self, kind: str):
