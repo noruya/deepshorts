@@ -42,10 +42,10 @@ export default function WritersRoom({ onSwitch }: Props) {
   const [usage, setUsage] = useState<MeetingUsage | null>(null);
   const [state, setState] = useState<MeetingState>("connecting");
   const [stream, setStream] = useState<{ speaker: string; text: string } | null>(null);
-  const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const running = state === "running";
   const paused = state === "paused";
@@ -140,10 +140,11 @@ export default function WritersRoom({ onSwitch }: Props) {
   }, []);
 
   function sendDirector() {
-    const text = input.trim();
+    // 비제어 입력창: 스트리밍 재렌더링이 한글 IME 조합을 깨지 않게 한다
+    const text = inputRef.current?.value.trim() || "";
     if (!text) return;
     send({ type: "director", text });
-    setInput("");
+    if (inputRef.current) inputRef.current.value = "";
   }
 
   function approve(m: MeetingMessage) {
@@ -235,10 +236,9 @@ export default function WritersRoom({ onSwitch }: Props) {
           <div className="room-input-row">
             <textarea
               className="room-input"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
+              ref={inputRef}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault();
                   sendDirector();
                 }
@@ -247,7 +247,7 @@ export default function WritersRoom({ onSwitch }: Props) {
               placeholder={busy ? "개입: 지금 입력하면 다음 발언에 우선 반영됩니다" : "감독님의 지시를 입력하세요"}
             />
             <div className="room-actions">
-              <button type="button" className="btn-primary" onClick={sendDirector} disabled={!input.trim()}>
+              <button type="button" className="btn-primary" onClick={sendDirector}>
                 {running ? "개입" : "지시하기"}
               </button>
               <button type="button" className="btn-ghost" onClick={() => send({ type: "pause" })} disabled={!running}>
